@@ -19,7 +19,7 @@ async def on_ready():
     print('--------')
     server = bot.get_server('392806051507994624')
     tea = discord.utils.get(server.members, id = '212404022697656321')
-    await bot.send_message(tea, "Hello. I am online.") #TODO: Uncomment this line.
+    #await bot.send_message(tea, "Hello. I am online.") #TODO: Uncomment this line.
 
 @bot.command(name = "hello", pass_context = True)
 async def hello(ctx):
@@ -86,17 +86,17 @@ async def designstorm(ctx):
             time_length = -1
             if "y" in time_choice_msg.content.casefold():
                 same_time_choice = True
-                await bot.say("Alright, let's do the same time for every category. How many minutes each?")
+                await bot.say("Alright, let's do the same time for every category. How many minutes each? 0 for untimed.")
                 time_length = await get_time_length(ctx)
                 break
             elif "n" in time_choice_msg.content.casefold():
-                await bot.say("Alright, let's do different times for each section. How many minutes would you like for " + categories[0] + "?")
+                await bot.say("Alright, let's do different times for each section. How many minutes would you like for " + categories[0] + "? 0 for untimed.")
                 time_length = await get_time_length(ctx)
                 break
             else:
                 await bot.say("Not sure what you mean. Do you want the same amount of time for every category?")
     else:
-        await bot.say("How many minutes would you like for " + categories[0] + "?")
+        await bot.say("How many minutes would you like for " + categories[0] + "? 0 for untimed.")
         time_length = await get_time_length(ctx)
 
     #Designstorm begins here.
@@ -107,20 +107,29 @@ async def designstorm(ctx):
             await bot.say("Your time is up, human.")
             await bot.say("How many minutes for " + category + "?")
             time_length = await get_time_length(ctx)
-
-        if int(time_length) == 60:
-            await bot.say("Alright, let's do **" + category + "**. You have " + str(int(time_length/60)) + " minute. Good luck!")
-        else:
-            await bot.say("Alright, let's do **" + category + "**. You have " + str(int(time_length/60)) + " minutes. Good luck!")
-        if time_length > 180:
-            await asyncio.sleep(time_length - time_left_alert)
-            await bot.say("Tick-tock, you have 1 minute left human. Start wrapping it up.")
-            await asyncio.sleep(time_left_alert)
-        else:
-            time_left_alert = 15
-            await asyncio.sleep(time_length - time_left_alert)
-            await bot.say("Tick-tock, you have 15 seconds left human. Start wrapping it up.")
-            await asyncio.sleep(time_left_alert)
+        if time_length == 0: # Untimed designstorm section.
+            await bot.say("Alright, let's do **" + category + "**. Say done whenever you're finished with this section.")
+            while True:
+                done_msg = await bot.wait_for_message(author = ctx.message.author)
+                if done_msg.content.casefold() == "done":
+                    await bot.delete_message(done_msg)
+                    break
+                else:
+                    done_msg = await bot.wait_for_message(author = ctx.message.author)
+        else: #Timed designstorm section.
+            if time_length == 60:
+                await bot.say("Alright, let's do **" + category + "**. You have " + str(int(time_length/60)) + " minute. Good luck!")
+            else:
+                await bot.say("Alright, let's do **" + category + "**. You have " + str(int(time_length/60)) + " minutes. Good luck!")
+            if time_length > 180:
+                await asyncio.sleep(time_length - time_left_alert)
+                await bot.say("Tick-tock, you have 1 minute left human. Start wrapping it up.")
+                await asyncio.sleep(time_left_alert)
+            else:
+                time_left_alert = 15
+                await asyncio.sleep(time_length - time_left_alert)
+                await bot.say("Tick-tock, you have 15 seconds left human. Start wrapping it up.")
+                await asyncio.sleep(time_left_alert)
 
         #At the end of each category, bot grabs all messages from user until it reaches a previous prompt by the bot.
         botto = discord.utils.get(ctx.message.server.members, id = bot_id)
