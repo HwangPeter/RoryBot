@@ -58,7 +58,7 @@ async def designstorm(ctx):
     prompt += "Or you can add your own category to the list directly.\n"
     await bot.say(prompt)
 
-    categories_msg = await bot.wait_for_message(author = ctx.message.author)
+    categories_msg = await bot.wait_for_message(author = ctx.message.author, channel = ctx.message.channel)
     categories = []
     categories = await get_categories(categories, categories_msg)
 
@@ -82,7 +82,7 @@ async def designstorm(ctx):
     if len(categories) > 1:
         await bot.say("Very well. Do you want the same amount of time for every category?")
         while True:
-            time_choice_msg = await bot.wait_for_message(author = ctx.message.author)
+            time_choice_msg = await bot.wait_for_message(author = ctx.message.author, channel = ctx.message.channel)
             time_length = -1
             if "y" in time_choice_msg.content.casefold():
                 same_time_choice = True
@@ -104,18 +104,18 @@ async def designstorm(ctx):
     await bot.say("Finally. Now we can get started!")
     for category in categories:
         if same_time_choice == False and category is not categories[0]:
-            await bot.say("Your time is up, human.")
+            await bot.say("Moving on to the next category, human.")
             await bot.say("How many minutes for " + category + "?")
             time_length = await get_time_length(ctx)
         if time_length == 0: # Untimed designstorm section.
             await bot.say("Alright, let's do **" + category + "**. Say done whenever you're finished with this section.")
             while True:
-                done_msg = await bot.wait_for_message(author = ctx.message.author)
+                done_msg = await bot.wait_for_message(author = ctx.message.author, channel = ctx.message.channel)
                 if done_msg.content.casefold() == "done":
                     await bot.delete_message(done_msg)
                     break
                 else:
-                    done_msg = await bot.wait_for_message(author = ctx.message.author)
+                    done_msg = await bot.wait_for_message(author = ctx.message.author, channel = ctx.message.channel)
         else: #Timed designstorm section.
             if time_length == 60:
                 await bot.say("Alright, let's do **" + category + "**. You have " + str(int(time_length/60)) + " minute. Good luck!")
@@ -165,7 +165,7 @@ async def designstorm(ctx):
 async def get_time_length(ctx):
     """ Checks against anything other than numbers. Multiplies answer by 60 to return minutes. """
     while True:
-        time_length_msg = await bot.wait_for_message(author = ctx.message.author)
+        time_length_msg = await bot.wait_for_message(author = ctx.message.author, channel = ctx.message.channel)
         if time_length_msg.content.isdigit():
             return (int(time_length_msg.content) * 60)
         else:
@@ -177,19 +177,19 @@ async def get_categories(categories, categories_msg):
     pos_end = content.find(',')
     pos_start = 0
     if pos_end == -1:
-        category = await remove_spaces(content)
+        category = content.strip()
         categories.append(content)
         return categories
     else: # more than 1 category
         while pos_end != -1 and pos_end != 0:
             category = await inc_between(content, pos_start, pos_end)
-            category = await remove_spaces(category)
+            category = content.strip()
             print("category is: " + category)
             categories.append(category)
             content = content[pos_end+1:]
             pos_end = content.find(',')
         if content:
-            category = await remove_spaces(content)
+            category = content.strip()
             print("category is: " + category)
             categories.append(category)
         return categories
@@ -200,18 +200,6 @@ async def inc_between(string, a, b):
     if b == -1: return ""
     if a >= b: return ""
     return string[a:b]
-
-async def remove_spaces(string):
-    """ Removes spaces at the beginning and end of a string """
-    index = 0
-    while string[index] == " ":
-        index += 1
-    string = string[index:]
-    index = len(string) - 1
-    while string[index] == " ":
-        index -= 1
-    string = string[:index + 1]
-    return string
 
 @bot.command(name = "multiply", pass_context = True)
 async def multiply(ctx):
@@ -231,7 +219,10 @@ async def multiply(ctx):
     else:
         await bot.say("Ya did it wrong.")
 
-
+@bot.command(pass_context = True)
+async def solve(ctx, *, equation : str = None):
+    await bot.say(equation)
+    print(equation)
 @bot.command(name = "dimensions", pass_context = True)
 async def dimensions(ctx):
     """ !dimensions ax + by = z where a > b and a,b,z are integers. """
