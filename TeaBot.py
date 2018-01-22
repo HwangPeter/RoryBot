@@ -295,7 +295,7 @@ async def shutdown(ctx):
 
 @bot.command(name = "timer", pass_context = True)
 async def time(ctx):
-    """ !timer time length, timer subject """
+    """ !timer time length, timer subject(optional) """
     time_left_alert = 60 #Amount of time that is left when bot warns user. In seconds.
     if len(ctx.message.content) > len("!timer ") and any(char.isdigit() for char in ctx.message.content): # Check for any information after the command
         #Removing spaces, and uppercases and splices off the command from message.
@@ -330,13 +330,20 @@ async def get_time(time):
     hours = "0"
     minutes = "0"
     seconds = "0"
-    if "h" in time: #contains hours
-        hours = time[:time.find("h")]
-    if "m" in time: #contains minutes
-        index = time.find("m") - 1
-        while time[index].isdigit():
-            index -= 1
-        minutes = time[index + 1:time.find("m")]
+    for index, char in enumerate(time):
+        if char == "h" and time[index-1].isdigit(): #contains hours
+            index2 = index-1
+            while time[index2].isdigit():
+                index2 -= 1
+            hours = time[index2+1:index]
+            break
+    for index, char in enumerate(time):
+        if char == "m" and time[index-1].isdigit(): #contains minutes
+            index2 = index-1
+            while time[index2].isdigit():
+                index2 -= 1
+            minutes = time[index2+1:index]
+            break
     for index, char in enumerate(time):
         if char == "s" and time[index-1].isdigit(): #contains seconds
             index2 = index-1
@@ -351,4 +358,4 @@ async def get_time(time):
 
 
 
-bot.run('NDAxMjg4OTM2OTQ2OTI1NTY4.DToBAQ.NHDs7awDtgJ5e7F5k6zi1u5JiQI')
+bot.run('token')
