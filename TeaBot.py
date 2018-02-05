@@ -6,6 +6,8 @@ from discord.ext import commands
 import platform
 from datetime import datetime
 
+from decimal import * #used for calculator function
+
 bot = commands.Bot(description="Tea's productivity bot", command_prefix="!", pm_help = True)
 
 @bot.event
@@ -20,6 +22,19 @@ async def on_ready():
     server = bot.get_server('392806051507994624')
     tea = discord.utils.get(server.members, id = '212404022697656321')
     #await bot.send_message(tea, "Hello. I am online.") #TODO: Uncomment this line.
+
+@bot.command(pass_context = True)
+async def rory(ctx):
+    embed = discord.Embed(color=0x4e5f94)
+    embed.set_image(url = "https://vignette.wikia.nocookie.net/deathbattlefanon/images/3/3a/Rory_mercury_crouching_vectorised_by_jaytec359-d965qws.png/revision/latest?cb=20160924211501")
+    embed.add_field(name = "Hi there", value = "human.", inline=True)
+    await bot.say("https://i.imgur.com/FUavi5H.png")
+    try:
+        await bot.send_message(ctx.message.channel, embed=embed)
+    except Exception as e:
+        await bot.say("I need embed permissions to reply properly.")
+        print("Failed !hello command.")
+        print(e)
 
 @bot.command(name = "hello", pass_context = True)
 async def hello(ctx):
@@ -59,8 +74,7 @@ async def designstorm(ctx):
     await bot.say(prompt)
 
     categories_msg = await bot.wait_for_message(author = ctx.message.author, channel = ctx.message.channel)
-    categories = []
-    categories = await get_categories(categories, categories_msg)
+    categories = await get_categories(categories_msg)
 
     #Translates numbers from prompt into their respective category.
     index = 0
@@ -74,7 +88,7 @@ async def designstorm(ctx):
             index += len(all_list)
         else:
             index += 1
-    categories = list(dict.fromkeys(categories))
+    categories = list(dict.fromkeys(categories)) #Deletes duplicates and maintains order.
     print(categories)
 
     #Some setup, prompts user for whether they want same time for each category or different times.
@@ -171,8 +185,9 @@ async def get_time_length(ctx):
         else:
             await bot.say("I'm not even from here but I know what an integer is. So should you.")
 
-async def get_categories(categories, categories_msg):
+async def get_categories(categories_msg):
     """ Takes user's desired categories answer and returns a list object containing each category. """
+    categories = []
     content = categories_msg.content
     pos_end = content.find(',')
     pos_start = 0
@@ -182,7 +197,7 @@ async def get_categories(categories, categories_msg):
         return categories
     else: # more than 1 category
         while pos_end != -1 and pos_end != 0:
-            category = await inc_between(content, pos_start, pos_end)
+            category = content[pos_start:pos_end]
             category = content.strip()
             print("category is: " + category)
             categories.append(category)
@@ -194,38 +209,157 @@ async def get_categories(categories, categories_msg):
             categories.append(category)
         return categories
 
-async def inc_between(string, a, b):
-    """ Returns string between indexes 'a' and 'b'. INCLUDES characters at indexes 'a' and 'b'. """
-    if a == -1: return ""
-    if b == -1: return ""
-    if a >= b: return ""
-    return string[a:b]
 
-@bot.command(name = "multiply", pass_context = True)
-async def multiply(ctx):
-    """ !multiply a * b or !multiply a x b where a and b are integers."""
-    if len(ctx.message.content) > len("!multiply ") and "x" in ctx.message.content.casefold():
-        content = ctx.message.content[len("!multiply "):].replace(" ", "")
-        #a and b are the numbers being multiplied
-        a = content[:content.find("x")]
-        b = content[content.find("x")+1:]
-        await bot.say("Your answer is: " + str(int(a)*int(b)))
-    elif len(ctx.message.content) > len("!multiply ") and "*" in ctx.message.content:
-        content = ctx.message.content[len("!multiply "):].replace(" ", "")
-        #a and b are the numbers being multiplied
-        a = content[:content.find("*")]
-        b = content[content.find("*")+1:]
-        await bot.say("Your answer is: " + str(int(a)*int(b)))
+@bot.command(aliases = ["calculate", "calculator"], pass_context = True)
+async def calc(ctx, *, content : str = None):
+    """ !calc [equation]. Accepts PEMDAS operators except for exponents/roots."""
+    if content:
+        tokens = await tokenize(content)
+        ans = await solve(tokens)
     else:
-        await bot.say("Ya did it wrong.")
+        await bot.say("Need something to calculate.")
 
-@bot.command(pass_context = True)
-async def solve(ctx, *, equation : str = None):
-    await bot.say(equation)
-    print(equation)
+async def solve(tokens):
+    index = 0
+    l_parens = []
+    while len(tokens) > 1:
+        while (")" in tokens or "(" in tokens):
+            index = 0
+            while index < len(tokens):
+                if tokens[index] == "(":
+                    l_parens.append(index)
+                    tokens.pop(index)
+                elif tokens[index] == ")":
+                    r_index = index
+                    if l_parens:
+                        l_index = l_parens[len(l_parens)-1]
+                        l_parens.pop(len(l_parens)-1)
+                        tokens.pop(r_index)
+                        tokens = await calculate(tokens, l_index, r_index-1)
+                        index = 0
+                    else:
+                        tokens.pop(index)
+                        index = 0
+                elif str(tokens[index]).isnumeric():
+                    #Range check, then checks token in front of number and adds "*" if there is a parentheses.
+                    if index < len(tokens)-1 and tokens[index+1] == "(":
+                        l_parens.append(index+1)
+                        tokens.pop(index+1)
+                        tokens.insert(index+1, "*")
+                        index += 2 #Increments by 2 since we added an element into list.
+                    else:
+                        index += 1
+                else:
+                    index += 1
+        index = 0
+        while index < len(tokens) and ("*" in tokens or "x" in tokens or "/" in tokens):
+            if tokens[index] == "x" or tokens[index] == "*" or tokens[index] == "/":
+                tokens = await calculate(tokens, index-1, index+1)
+                index = 0
+            else:
+                index += 1
+        index = 0
+        while index < len(tokens) and ("+" in tokens or "-" in tokens):
+            if tokens[index] == "+" or tokens[index] == "-":
+                tokens = await calculate(tokens, index-1, index+1)
+                index = 0
+            else:
+                index += 1
+
+    if tokens:
+        if float(tokens[0]).is_integer(): #Using float instead of decimal because of is_integer() function.
+            await bot.say("Answer is : " + str(int(Decimal(tokens[0]))))
+        else:
+            await bot.say("Answer is : " + tokens[0])
+    else:
+        await bot.say("Something is wrong with your syntax.")
+
+
+async def calculate(tokens, l_index, r_index):
+    index = l_index
+    while index <= r_index:
+        if tokens[index] == "*" or tokens[index] == "x" or tokens[index] == "/":
+            tokens = await calc2(tokens, tokens[index], index)
+            r_index -= 2
+        elif tokens[index] == "+" or tokens[index] == "-":
+            tokens = await calc2(tokens, tokens[index], index)
+            if tokens:
+                r_index -= 2
+            else:
+                return ""
+        else:
+            index += 1
+    return tokens
+
+async def calc2(tokens, operator, index):
+    if operator == "*" or operator == "x":
+        try:
+            num = Decimal(tokens[index-1])*Decimal(tokens[index+1])
+        except Exception as e:
+            print("Syntax went wrong.")
+            print(e)
+            return ""
+    elif operator == "/":
+        try:
+            num = Decimal(tokens[index-1])/Decimal(tokens[index+1])
+        except Exception as e:
+            print("Syntax went wrong.")
+            print(e)
+            return ""
+    elif operator == "+":
+        try:
+            num = Decimal(tokens[index-1])+Decimal(tokens[index+1])
+        except Exception as e:
+            print("Syntax went wrong.")
+            print(e)
+            return ""
+    elif operator == "-":
+        try:
+            num = Decimal(tokens[index-1])-Decimal(tokens[index+1])
+        except Exception as e:
+            print("Syntax went wrong.")
+            print(e)
+            return ""
+    try:
+        for i in range(3):
+            tokens.pop(index-1)
+        tokens.insert(index-1, str(num))
+
+    except Exception as e:
+        print("Syntax went wrong.")
+        print(e)
+        return ""
+    return tokens
+
+
+async def tokenize(content):
+    content = content.replace(" ", "")
+    index = 0
+    tokens = []
+    x = ""
+
+    while index < len(content):
+        if (content[index] == "-" and index > 0 and not content[index-1].isnumeric()) or index == 0:
+            x = ''.join([x, content[index]])
+            index += 1
+        while index < len(content) and (content[index].isdigit() or content[index] == "."):
+            x = ''.join([x, content[index]])
+            index += 1
+        if(x):
+            tokens.append(x)
+            x = ""
+        elif index < len(content):
+            tokens.append(content[index])
+            index += 1
+    index = 0
+    while index < len(tokens):
+        index += 1
+    return tokens
+
+
 @bot.command(name = "dimensions", pass_context = True)
 async def dimensions(ctx):
-    """ !dimensions ax + by = z where a > b and a,b,z are integers. """
+    """ !dimensions ax + by = z where a,b,z are integers. Finds all whole number solutions."""
     temp_ans = 0
     x = 0
     y = 0
@@ -236,7 +370,7 @@ async def dimensions(ctx):
         a, b, ans = await get_values(content)
         if a and b and ans:
             temp_ans = ans
-            while temp_ans > 0:
+            while temp_ans >= 0:
                 if temp_ans%b == 0:
                     y = temp_ans/b
                     answers += "x = " + str(x) + ", y = " + str(int(y)) + "\n"
