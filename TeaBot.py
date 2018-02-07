@@ -212,9 +212,9 @@ async def get_categories(categories_msg):
 
 @bot.command(aliases = ["calculate", "calculator"], pass_context = True)
 async def calc(ctx, *, content : str = None):
-    """ !calc [equation]. Accepts PEMDAS operators except for exponents/roots."""
+    """ !calc [equation]. Accepts all PEMDAS operators except for exponents/roots."""
     if content:
-        tokens = await tokenize(content)
+        tokens = await tokenize(content.casefold())
         ans = await solve(tokens)
         try: #In a try block because converting the token to float can break if syntax is wrong (ex. 1.2.3)
             if float(ans[0]).is_integer(): #Using float instead of decimal because of is_integer() function.
@@ -229,6 +229,7 @@ async def calc(ctx, *, content : str = None):
         await bot.say("Need something to calculate.")
 
 async def solve(tokens):
+    """ Ensures PEMDAS is followed correctly. Passes off calculations to other functions."""
     index = 0
     l_parens = []
     while len(tokens) > 1:
@@ -250,12 +251,11 @@ async def solve(tokens):
                         tokens = await calculate(tokens, l_index, r_index-1)
                     else:
                         tokens.pop(index)
-                    index = 0
+                    print("TOKENS HUR: " + str(tokens)) #TODO:
+                    print("index is: " + str(index) + " : " )
                 elif any(char.isdigit() for char in tokens[index]): #Using any because it may be a signed number.
                     #Range check, then checks token in front of number and adds "*" if there is a parentheses.
                     if index < len(tokens)-1 and tokens[index+1] == "(":
-                        l_parens.append(index+2)
-                        tokens.pop(index+1)
                         tokens.insert(index+1, "*")
                         index += 2 #Increments by 2 since we added an element into list.
                     else:
@@ -284,6 +284,7 @@ async def solve(tokens):
 
 
 async def calculate(tokens, l_index, r_index):
+    """Calculates anything between two indexes. Used most frequently for everything between parentheses."""
     index = l_index
     while index <= r_index:
         if tokens[index] == "*" or tokens[index] == "x" or tokens[index] == "/":
@@ -293,17 +294,23 @@ async def calculate(tokens, l_index, r_index):
             index += 1
     index = l_index
     while index <= r_index:
-        if tokens[index] == "+" or tokens[index] == "-":
-            tokens = await calc2(tokens, tokens[index], index)
-            if tokens:
-                r_index -= 2
+        try:
+            if tokens[index] == "+" or tokens[index] == "-":
+                tokens = await calc2(tokens, tokens[index], index)
+                if tokens:
+                    r_index -= 2
+                else:
+                    return ""
             else:
-                return ""
-        else:
-            index += 1
+                index += 1
+        except Exception as e:
+            print("Syntax went wrong.")
+            print(e)
+            return ""
     return tokens
 
 async def calc2(tokens, operator, index):
+    """Calculates a single calculation. Index is the location of the operator. Ex. a+b becomes c where c = a+b."""
     if operator == "*" or operator == "x":
         try:
             num = Decimal(tokens[index-1])*Decimal(tokens[index+1])
@@ -352,12 +359,21 @@ async def tokenize(content):
     number = ""
 
     while index < len(content):
-        #Adjacent digits, '-', '+', and decimal points are grouped together as a single token. (A number)
-        if ((content[index] == "-" or content[index] == "+") and index > 0 and not content[index-1].isnumeric()):
+        #Adjacent digits, '+', and decimal points are grouped together as a single token. (A number)
+        #Where '-' is indicating negative instead of subtraction, it is replaced with tokens "-1" and "*"
+        if (content[index] == "+" and index > 0 and (not content[index-1].isnumeric() and content[index-1] != ")")):
             number = ''.join([number, content[index]])
             index += 1
-        elif ((content[index] == "-" or content[index] == "+") and index == 0):
+        elif (content[index] == "+" and index == 0):
             number = ''.join([number, content[index]])
+            index += 1
+        if (content[index] == "-" and index > 0 and (not content[index-1].isnumeric() and content[index-1] != ")")):
+            tokens.append("-1")
+            tokens.append("*")
+            index += 1
+        elif (content[index] == "-" and index == 0):
+            tokens.append("-1")
+            tokens.append("*")
             index += 1
         while index < len(content) and (content[index].isdigit() or content[index] == "."):
             number = ''.join([number, content[index]])
@@ -409,11 +425,15 @@ async def dimensions(ctx):
 
 async def get_values(content):
     a = content[:content.find("x")]
-    if not a.isdigit():
+    if not a:
+        a = "1"
+    elif not a.isdigit():
         await bot.say("a has to be an integer.")
         return 0, 0, 0
     b = content[content.find("+")+1:content.find("y")]
-    if not b.isdigit():
+    if not b:
+        b = "1"
+    elif not b.isdigit():
         await bot.say("b has to be an integer.")
         return 0, 0, 0
     ans = content[content.find("=")+1:]
@@ -425,7 +445,7 @@ async def get_values(content):
 
 @bot.command(name = "shutdown", pass_context = True)
 async def shutdown(ctx):
-    """ !shutdown Turns off the bot. """
+    """ !shutdown to turn off the bot. """
     server = bot.get_server('392806051507994624')
     tea = discord.utils.get(server.members, id = '212404022697656321')
     schlong = discord.utils.get(server.members, id = '217513859412525057')
@@ -439,7 +459,7 @@ async def shutdown(ctx):
 
 @bot.command(name = "timer", pass_context = True)
 async def time(ctx):
-    """ !timer time length, timer subject(optional) """
+    """ !timer [time length], [timer subject(optional)] """
     time_left_alert = 60 #Amount of time that is left when bot warns user. In seconds.
     if len(ctx.message.content) > len("!timer ") and any(char.isdigit() for char in ctx.message.content): # Check for any information after the command
         #Removing spaces, and uppercases and splices off the command from message.
