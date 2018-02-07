@@ -216,6 +216,15 @@ async def calc(ctx, *, content : str = None):
     if content:
         tokens = await tokenize(content)
         ans = await solve(tokens)
+        try: #In a try block because converting the token to float can break if syntax is wrong (ex. 1.2.3)
+            if float(ans[0]).is_integer(): #Using float instead of decimal because of is_integer() function.
+                await bot.say("Answer is : " + str(int(Decimal(ans[0]))))
+            else:
+                await bot.say("Answer is : " + ans[0])
+        except Exception as e:
+            await bot.say("Something is wrong with your syntax.")
+            print(str(ans))
+            print(e)
     else:
         await bot.say("Need something to calculate.")
 
@@ -231,19 +240,21 @@ async def solve(tokens):
                     tokens.pop(index)
                 elif tokens[index] == ")":
                     r_index = index
+                    #Inserts '*' if token following ')' is a '(' or any number. (3)2 becomes (3)*2
+                    if index < len(tokens)-1 and (tokens[index+1] == "(" or any(char.isdigit() for char in tokens[index+1])):
+                        tokens.insert(index+1, "*")
                     if l_parens:
                         l_index = l_parens[len(l_parens)-1]
                         l_parens.pop(len(l_parens)-1)
                         tokens.pop(r_index)
                         tokens = await calculate(tokens, l_index, r_index-1)
-                        index = 0
                     else:
                         tokens.pop(index)
-                        index = 0
-                elif str(tokens[index]).isnumeric():
+                    index = 0
+                elif any(char.isdigit() for char in tokens[index]): #Using any because it may be a signed number.
                     #Range check, then checks token in front of number and adds "*" if there is a parentheses.
                     if index < len(tokens)-1 and tokens[index+1] == "(":
-                        l_parens.append(index+1)
+                        l_parens.append(index+2)
                         tokens.pop(index+1)
                         tokens.insert(index+1, "*")
                         index += 2 #Increments by 2 since we added an element into list.
@@ -267,12 +278,9 @@ async def solve(tokens):
                 index += 1
 
     if tokens:
-        if float(tokens[0]).is_integer(): #Using float instead of decimal because of is_integer() function.
-            await bot.say("Answer is : " + str(int(Decimal(tokens[0]))))
-        else:
-            await bot.say("Answer is : " + tokens[0])
+        return tokens
     else:
-        await bot.say("Something is wrong with your syntax.")
+        return ""
 
 
 async def calculate(tokens, l_index, r_index):
@@ -281,7 +289,11 @@ async def calculate(tokens, l_index, r_index):
         if tokens[index] == "*" or tokens[index] == "x" or tokens[index] == "/":
             tokens = await calc2(tokens, tokens[index], index)
             r_index -= 2
-        elif tokens[index] == "+" or tokens[index] == "-":
+        else:
+            index += 1
+    index = l_index
+    while index <= r_index:
+        if tokens[index] == "+" or tokens[index] == "-":
             tokens = await calc2(tokens, tokens[index], index)
             if tokens:
                 r_index -= 2
@@ -333,21 +345,28 @@ async def calc2(tokens, operator, index):
 
 
 async def tokenize(content):
+    """ Returns a list containing each individual token."""
     content = content.replace(" ", "")
     index = 0
     tokens = []
-    x = ""
+    number = ""
 
     while index < len(content):
-        if (content[index] == "-" and index > 0 and not content[index-1].isnumeric()) or index == 0:
-            x = ''.join([x, content[index]])
+        #Adjacent digits, '-', '+', and decimal points are grouped together as a single token. (A number)
+        if ((content[index] == "-" or content[index] == "+") and index > 0 and not content[index-1].isnumeric()):
+            number = ''.join([number, content[index]])
+            index += 1
+        elif ((content[index] == "-" or content[index] == "+") and index == 0):
+            number = ''.join([number, content[index]])
             index += 1
         while index < len(content) and (content[index].isdigit() or content[index] == "."):
-            x = ''.join([x, content[index]])
+            number = ''.join([number, content[index]])
             index += 1
-        if(x):
-            tokens.append(x)
-            x = ""
+        if(number):
+            tokens.append(number)
+            number = ""
+        elif index < len(content) and (content[index].isalpha() and content[index] != 'x'):
+            return ""
         elif index < len(content):
             tokens.append(content[index])
             index += 1
