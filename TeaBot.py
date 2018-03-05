@@ -249,15 +249,16 @@ async def solve(tokens):
                         l_parens.pop(len(l_parens)-1)
                         tokens.pop(r_index)
                         tokens = await calculate(tokens, l_index, r_index-1)
+                        # if l_index > 2 and tokens[l_index-2] == "-1": #If there is a -1 * (), t
+                        #     tokens = await calculate(tokens, l_index-2, l_index)
                     else:
                         tokens.pop(index)
-                    print("TOKENS HUR: " + str(tokens)) #TODO:
-                    print("index is: " + str(index) + " : " )
                 elif any(char.isdigit() for char in tokens[index]): #Using any because it may be a signed number.
                     #Range check, then checks token in front of number and adds "*" if there is a parentheses.
                     if index < len(tokens)-1 and tokens[index+1] == "(":
                         tokens.insert(index+1, "*")
-                        index += 2 #Increments by 2 since we added an element into list.
+
+                        #index += 2 #Increments by 2 since we added an element into list.
                     else:
                         index += 1
                 else:
@@ -307,6 +308,7 @@ async def calculate(tokens, l_index, r_index):
             print("Syntax went wrong.")
             print(e)
             return ""
+    print("TOKENS: " + str(tokens))
     return tokens
 
 async def calc2(tokens, operator, index):
@@ -357,6 +359,7 @@ async def tokenize(content):
     index = 0
     tokens = []
     number = ""
+    add_parens = 0
 
     while index < len(content):
         #Adjacent digits, '+', and decimal points are grouped together as a single token. (A number)
@@ -367,18 +370,43 @@ async def tokenize(content):
         elif (content[index] == "+" and index == 0):
             number = ''.join([number, content[index]])
             index += 1
+        #If true, '-' is negation, not subtraction
         if (content[index] == "-" and index > 0 and (not content[index-1].isnumeric() and content[index-1] != ")")):
-            tokens.append("-1")
-            tokens.append("*")
-            index += 1
+            if index < len(content) - 1 and (content[index+1].isnumeric() or content[index+1] == "."):
+                number = ''.join([number, content[index]])
+                index += 1
+                while index < len(content) - 1 and (content[index].isnumeric() or content[index] == "."):
+                    number = ''.join([number, content[index]])
+                    index += 1
+            elif index < len(content) - 1 and content[index+1] == "(":
+                tokens.append("(")
+                tokens.append("-1")
+                tokens.append("*")
+                index += 1
+                add_parens += 1
+            if number and content[index] == "(":
+                tokens.append("(")
+                tokens.append(number)
+                tokens.append("*")
+                tokens.append("(")
+                number = ""
+                index += 1
+                add_parens += 1
+            if content[index] == "-" and index < len(content) - 1 and not content[index+1] == "(":
+                tokens.append("-1")
+                tokens.append("*")
+                index += 1
         elif (content[index] == "-" and index == 0):
             tokens.append("-1")
             tokens.append("*")
             index += 1
-        while index < len(content) and (content[index].isdigit() or content[index] == "."):
+        if content[index] == ")" and add_parens > 0:
+            tokens.append(")")
+            add_parens -= 1
+        while index < len(content) and (content[index].isnumeric() or content[index] == "."):
             number = ''.join([number, content[index]])
             index += 1
-        if(number):
+        if number:
             tokens.append(number)
             number = ""
         elif index < len(content) and (content[index].isalpha() and content[index] != 'x'):
@@ -389,8 +417,8 @@ async def tokenize(content):
     index = 0
     while index < len(tokens):
         index += 1
+    print("tokens are : " + str(tokens)) #TODO:
     return tokens
-
 
 @bot.command(name = "dimensions", pass_context = True)
 async def dimensions(ctx):
