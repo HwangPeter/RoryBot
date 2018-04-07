@@ -198,13 +198,13 @@ async def get_categories(categories_msg):
     else: # more than 1 category
         while pos_end != -1 and pos_end != 0:
             category = content[pos_start:pos_end]
-            category = content.strip()
-            print("category is: " + category)
+            category = category.strip()
+            print("cateeegory is: " + category)
             categories.append(category)
             content = content[pos_end+1:]
             pos_end = content.find(',')
         if content:
-            category = content.strip()
+            category = category.strip()
             print("category is: " + category)
             categories.append(category)
         return categories
