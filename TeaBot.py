@@ -550,4 +550,4 @@ async def get_time(time):
 
 
 
-bot.run('token')
+bot.run('NDAxMjg4OTM2OTQ2OTI1NTY4.DToBAQ.NHDs7awDtgJ5e7F5k6zi1u5JiQI')
